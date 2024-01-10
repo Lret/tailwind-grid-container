@@ -2,9 +2,12 @@
   "name": "tailwind-grid-container",
   "version": "0.0.1",
   "description": "A tailwind plugin to generate a container class with css grid",
-  "main": "index.js",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "lint": "tsc"
   },
   "repository": {
     "type": "git",
@@ -25,5 +28,9 @@
   "homepage": "https://github.com/Lret/tailwind-grid-container#readme",
   "peerDependencies": {
     "tailwindcss": ">=2.0.0 || >=3.0.0 || >=3.0.0-alpha.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.1",
+    "typescript": "^5.3.3"
   }
 }
