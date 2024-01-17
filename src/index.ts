@@ -7,31 +7,44 @@ type WidthOption = number | string;
 type ScreenSize = keyof typeof defaultTheme.screens | 'DEFAULT' | (string & {}); //'DEFAULT' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | (string & {});
 type ScreenOption = Partial<Record<ScreenSize, WidthOption>>;
 
-type SizeOption = WidthOption | ScreenOption
+type SizeOption = WidthOption | ScreenOption;
 
 type Feature = {
     [name: string]: SizeOption;
 }
 
 type PluginOptions = {
-    baseName?: string
-    padding: SizeOption;
-    screens: SizeOption;
-    subContainers?: Feature
+    baseName?: string; // (default is 'container') name for the base container 
+    fullSizeName?: string; // (default is 'full') name for the full width container inside the base container, this allows the escape the container 
+    backgroundPrefixName?: string; // (default is 'bg') name for the background prefix specifier, this allows to escape the container and place the children back inside the container, this mimics the element to be only used as a background 
+
+    subContainers?: Feature; // Sub container width or widths, work the same as screens from the default container
+
+    padding?: SizeOption; // Padding for the container that will always be applied, work the same as the padding from the default container
+    screens?: SizeOption; // Max width of the content container inside the base container, work the same as screens from the default container
 }
 
 
 /* Plugin */
-// const DEFAULT_OPTIONS: PluginOptions = {}
+const DEFAULT_OPTIONS: Required<Pick<PluginOptions, "baseName" | "fullSizeName" | "backgroundPrefixName">> = {
+    baseName: 'container',
+    fullSizeName: 'full',
+    backgroundPrefixName: 'bg',
+}
 
-export default plugin.withOptions<PluginOptions>((options) => ({
-    addBase, 
+export default plugin.withOptions<PluginOptions>((options) => ({ 
     addComponents,
-    addUtilities,
     config
 }) => {
     const screens = config().theme?.screens ?? defaultTheme.screens;
-    const { baseName, screens: contentMaxWidth, padding, subContainers } = options;
+    const {
+        baseName = DEFAULT_OPTIONS.baseName,
+        fullSizeName = DEFAULT_OPTIONS.fullSizeName,
+        backgroundPrefixName = DEFAULT_OPTIONS.backgroundPrefixName,
+        subContainers,
+        screens: contentMaxWidth = (defaultTheme.screens as unknown as ScreenSize),
+        padding = 0,
+    } = options;
     const mediaBreakpoints = useMediaBreakpointResolver(screens)
     
     addComponents([
@@ -53,7 +66,7 @@ export default plugin.withOptions<PluginOptions>((options) => ({
 
         /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
         mediaBreakpoints(contentMaxWidth, w => ({
-            '.container-base': {
+            [`.${baseName}`]: {
                 [getMaxWidthProperty('content')]: getWidth(w),
             }
         })),
@@ -72,7 +85,7 @@ export default plugin.withOptions<PluginOptions>((options) => ({
         )  */
         mergeObjects(Object.entries(subContainers ?? {}).map(([name, value]) => (
             mediaBreakpoints(value, val => ({
-                '.container-base': {
+                [`.${baseName}`]: {
                     [getMaxWidthProperty(name)]: getWidth(val),
                     [getSideWidthProperty(name)]: `calc((var(${getMaxWidthProperty(name)}) - var(${getMaxWidthProperty('content')})) / 2 )`,
                     [getWidthProperty(name)]: `minmax(0, var(${getSideWidthProperty(name)}))`
@@ -87,13 +100,13 @@ export default plugin.withOptions<PluginOptions>((options) => ({
                 '--container-padding': getWidth(padding)
             },*/
 
-            '.container-base > *' : {
+            [`.${baseName} > *`] : {
                 /* Padding removed (remove padding from children to prevent double padding) */
                 [getPaddingProperty('container')]: '0px'
             },
-            '.container-base': {
+            [`.${baseName}`]: {
                 /* Full */
-                [getWidthProperty('full')]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
+                [getWidthProperty(fullSizeName)]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
 
                 /* Content */
                 [getWidthProperty('content')]: `min(var(${getMaxWidthProperty('content')}), 100% - (var(${getPaddingProperty('container')}) * 2))`,
@@ -103,7 +116,7 @@ export default plugin.withOptions<PluginOptions>((options) => ({
                 /* Generate the grid with sub containers and padding applied*/
                 display: 'grid',
                 'grid-template-columns': `
-                    [full-start] var(${getWidthProperty('full')}) 
+                    [${fullSizeName}-start] var(${getWidthProperty(fullSizeName)}) 
                     ${ Object.keys(subContainers ?? {}).map((name) => 
                     //   [feature-start] var(--feature-width)
                         `[${name}-start] var(${getWidthProperty(name)})`
@@ -113,21 +126,21 @@ export default plugin.withOptions<PluginOptions>((options) => ({
                     //   var(--feature-width) [feature-end]
                         `var(${getWidthProperty(name)}) [${name}-end]`
                     ).join('\n') }
-                    var(${getWidthProperty('full')}) [full-end]
+                    var(${getWidthProperty(fullSizeName)}) [${fullSizeName}-end]
                 `,
             },
             /* Set the children default with to the container (use -escape suffix to use the full container width) */
-            '.container-base > *, .container-full-bg > *': {
+            [`.${baseName} > *, .container-${fullSizeName}-${backgroundPrefixName} > *`]: {
                 'grid-column': 'content',
             },
             /* Full width container */
             /* Only full has the choice between background (only full width the background and keep the children content width), because it is based on the whole width with paddding. All feature are just segments/stops between full and content */
-            '.container-full-bg': {
+            [`.container-${fullSizeName}-${backgroundPrefixName}`]: {
                 display: 'grid',
                 'grid-template-columns': 'inherit',
             },
-            '.container-full-bg, .container-full': {
-                'grid-column': 'full',
+            [`.container-${fullSizeName}-${backgroundPrefixName}, .container-${fullSizeName}`]: {
+                'grid-column': fullSizeName,
             },
 
             /* Generated sub-containers names for grid-columns */
