@@ -5,7 +5,9 @@ export default {
     extend: {},
   },
   plugins: [
+    // require("../src/index")({ // <- can be used for development while in the tailwind-grid-container package
     require("tailwind-grid-container")({
+      baseName: 'container-base',
       padding: 20,
       // padding: {
       //   DEFAULT: 10,
@@ -14,9 +16,9 @@ export default {
       //   xl: 40,
       //   '2xl': 60,
       // },
-      // maxWidth: 400,
-      maxWidth: {
-        DEFAULT: 400,
+      // screens: 400,
+      screens: {
+        // DEFAULT: 400,
         sm: 640,
         md: 768,
         lg: 1024,

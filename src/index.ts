@@ -36,19 +36,21 @@ export default plugin.withOptions<PluginOptions>((options) => ({
     addComponents,
     config
 }) => {
-    const screens = config().theme?.screens ?? defaultTheme.screens;
     const {
         baseName = DEFAULT_OPTIONS.baseName,
         fullSizeName = DEFAULT_OPTIONS.fullSizeName,
         backgroundPrefixName = DEFAULT_OPTIONS.backgroundPrefixName,
         subContainers,
-        screens: contentMaxWidth = (defaultTheme.screens as unknown as ScreenSize),
+        screens = (defaultTheme.screens as unknown as ScreenSize),
         padding = 0,
     } = options;
-    const mediaBreakpoints = useMediaBreakpointResolver(screens)
-    
+    // Add a default of 100% maxWidth for the content when the DEFAULT property is not set
+    const contentMaxWidth = typeof screens !== "object" ? screens : { ...(screens.DEFAULT === undefined ? { DEFAULT: '100%' } : {}), ...screens };
+    const screensSizes = config().theme?.screens ?? defaultTheme.screens;
+    const mediaBreakpoints = useMediaBreakpointResolver(screensSizes);
+
     addComponents([
-        /* Generate the outer padding that will always be applied for all screen size breakpoints specified in 'padding' parameter when giving a object instead of a value */
+        /* Generate the outer padding that will be applied for all screen size breakpoints specified in 'padding' parameter when giving a object instead of a value */
         /* 
             padding: 10, <- when only a value is applied this will be set for all breakpoints
             
@@ -75,11 +77,11 @@ export default plugin.withOptions<PluginOptions>((options) => ({
         /* Sub containers (the blocks are generated based on input from the user, ex:
             popout: { <- name of the sub container
                 screens: {
-                sm: 600, <- max width when a number is applied a 'px' suffix will be add
-                md: 728,
-                lg: '984px',
+                    sm: 600, <- max width when a number is applied a 'px' suffix will be add
+                    md: 728,
+                    lg: '984px',
 
-                sm: 'minmax(0, 5rem)' <- string to override default calculation see (--feature-width)
+                    sm: 'minmax(0, 5rem)' <- string to override default calculation see (--feature-width)
                 }
             }
         )  */
@@ -94,19 +96,15 @@ export default plugin.withOptions<PluginOptions>((options) => ({
         ))),
 
         {
-            // @mediaBreakpoint
-            /*':root': {
-                /* Padding / gap (has to be set in root to override) * /
-                '--container-padding': getWidth(padding)
-            },*/
+            /* Generate the outer padding that will be applied for all screen size breakpoints (this part is split out above to work with every @media (min-width: *)) */
 
-            [`.${baseName} > *`] : {
+            [`.${baseName} > *`]: {
                 /* Padding removed (remove padding from children to prevent double padding) */
                 [getPaddingProperty('container')]: '0px'
             },
             [`.${baseName}`]: {
                 /* Full */
-                [getWidthProperty(fullSizeName)]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
+                [getWidthProperty('full')]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
 
                 /* Content */
                 [getWidthProperty('content')]: `min(var(${getMaxWidthProperty('content')}), 100% - (var(${getPaddingProperty('container')}) * 2))`,
@@ -116,17 +114,17 @@ export default plugin.withOptions<PluginOptions>((options) => ({
                 /* Generate the grid with sub containers and padding applied*/
                 display: 'grid',
                 'grid-template-columns': `
-                    [${fullSizeName}-start] var(${getWidthProperty(fullSizeName)}) 
+                    [full-start] var(${getWidthProperty('full')}) 
                     ${ Object.keys(subContainers ?? {}).map((name) => 
                     //   [feature-start] var(--feature-width)
                         `[${name}-start] var(${getWidthProperty(name)})`
                     ).join('\n') }
-                    [content-start] var(${getWidth('content')}) [content-end] 
+                    [content-start] var(${getWidthProperty('content')}) [content-end] 
                     ${ Object.keys(subContainers ?? {}).reverse().map((name) => 
                     //   var(--feature-width) [feature-end]
                         `var(${getWidthProperty(name)}) [${name}-end]`
                     ).join('\n') }
-                    var(${getWidthProperty(fullSizeName)}) [${fullSizeName}-end]
+                    var(${getWidthProperty('full')}) [full-end]
                 `,
             },
             /* Set the children default with to the container (use -escape suffix to use the full container width) */
@@ -140,7 +138,7 @@ export default plugin.withOptions<PluginOptions>((options) => ({
                 'grid-template-columns': 'inherit',
             },
             [`.container-${fullSizeName}-${backgroundPrefixName}, .container-${fullSizeName}`]: {
-                'grid-column': fullSizeName,
+                'grid-column': 'full',
             },
 
             /* Generated sub-containers names for grid-columns */
@@ -167,7 +165,7 @@ export default plugin.withOptions<PluginOptions>((options) => ({
  *               '--test-variable-width': w,
  *           }
  *       })
- * and the screens are:
+ * and the screensSizes are:
  *      {
  *          sm: '360px',
  *          md: '720px',
@@ -197,9 +195,9 @@ export default plugin.withOptions<PluginOptions>((options) => ({
  *      }
  */
 function mediaBreakpointResolver<T extends object>(
-    screens: object,
+    screensSizes: object,
     sizes: SizeOption,
-    callBack: (val: WidthOption) => T
+    callBack: (val: WidthOption) => T,
 ) {
     // When it is not of type ScreenOption (not an object width different screen sizes)
     if (typeof sizes !== 'object')
@@ -212,7 +210,7 @@ function mediaBreakpointResolver<T extends object>(
         .entries(sizes)
         .reduce((acc, [key, val]) => {
             // @ts-ignore
-            const breakpoint = screens[key];
+            const breakpoint = screensSizes[key];
             if (breakpoint === undefined || val === undefined || key === 'DEFAULT')
                 return acc;
             
@@ -226,8 +224,8 @@ function mediaBreakpointResolver<T extends object>(
 /**
  * Simple wrapper for the mediaBreakpointResolver function to abstract screen sizes
  */
-function useMediaBreakpointResolver(screens: object) {
-    return <T extends object>(value: SizeOption, callBack: (val: WidthOption) => T) => mediaBreakpointResolver(screens, value, callBack);
+function useMediaBreakpointResolver(screensSizes: object) {
+    return <T extends object>(value: SizeOption, callBack: (val: WidthOption) => T) => mediaBreakpointResolver(screensSizes, value, callBack);
 } 
 
 
@@ -267,7 +265,7 @@ function getSideWidthProperty(prefix: string) {
 }
 
 /**
- * Retrieve the CSS variable name from a max widht property with a given prefix ([prefix]-max-width)
+ * Retrieve the CSS variable name from a max width property with a given prefix ([prefix]-max-width)
  */
 function getMaxWidthProperty(prefix: string) {
     const MAX_WIDTH_PROPERTY = 'max-width';

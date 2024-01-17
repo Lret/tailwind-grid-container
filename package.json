@@ -1,6 +1,6 @@
 {
   "name": "tailwind-grid-container",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "A tailwind plugin to generate a container class with css grid",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
