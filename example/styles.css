@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  .container-color-debugging {
+    @apply space-y-10;
+  }
+
+  .container-color-debugging > * {
+    @apply bg-pink-900 h-80 py-8;
+  }
+
+  .container-color-debugging > * > * {
+    @apply bg-pink-600 h-48 py-8;
+  }
+
+  .container-color-debugging > * > * > * {
+    @apply bg-yellow-600 h-40 py-8;
+  }
+
+  .container-color-debugging > * > * > * > * {
+    @apply h-32 py-8;
+  }
+
+  .content {
+    @apply !bg-slate-600;
+  }
+}
