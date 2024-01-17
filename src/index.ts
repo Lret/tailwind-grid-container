@@ -34,6 +34,7 @@ const DEFAULT_OPTIONS: Required<Pick<PluginOptions, "baseName" | "fullSizeName" 
 
 export default plugin.withOptions<PluginOptions>((options) => ({ 
     addComponents,
+    corePlugins,
     config
 }) => {
     const {
@@ -44,6 +45,26 @@ export default plugin.withOptions<PluginOptions>((options) => ({
         screens = (defaultTheme.screens as unknown as ScreenSize),
         padding = 0,
     } = options;
+
+    if (corePlugins('container') && baseName === 'container')
+        throw new Error(`
+# Tailwind-grid-container error, container class already exists.
+
+By default tailwind-grid-container will try to override your 'container' class.
+To make this work tailwinds core container class should be disabled by adding 
+the following line to your tailwind.config.js:
+
+corePlugins: {
+    container: false,
+},
+
+To use a different class name, override the 'baseName' 
+property in the tailwind-grid-container plugin:
+
+require("tailwind-grid-container")({
+    baseName: 'container-base',
+}),`)
+
     // Add a default of 100% maxWidth for the content when the DEFAULT property is not set
     const contentMaxWidth = typeof screens !== "object" ? screens : { ...(screens.DEFAULT === undefined ? { DEFAULT: '100%' } : {}), ...screens };
     const screensSizes = config().theme?.screens ?? defaultTheme.screens;

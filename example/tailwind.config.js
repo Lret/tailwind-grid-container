@@ -4,10 +4,13 @@ export default {
   theme: {
     extend: {},
   },
+  corePlugins: {
+    container: false,
+  },
   plugins: [
     // require("../src/index")({ // <- can be used for development while in the tailwind-grid-container package
     require("tailwind-grid-container")({
-      baseName: 'container-base',
+      // baseName: 'container-base',
       padding: 20,
       // padding: {
       //   DEFAULT: 10,
