@@ -47,14 +47,14 @@ export default plugin.withOptions<PluginOptions>((options) => ({
         mediaBreakpoints(padding, p => ({
             ':root': {
                 /* Padding / gap (has to be set in root to override) */
-                '--container-padding': getWidth(p)
+                [getPaddingProperty('container')]: getWidth(p)
             }
         })),
 
         /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
         mediaBreakpoints(contentMaxWidth, w => ({
             '.container-base': {
-                '--content-max-width': getWidth(w),
+                [getMaxWidthProperty('content')]: getWidth(w),
             }
         })),
 
@@ -73,9 +73,9 @@ export default plugin.withOptions<PluginOptions>((options) => ({
         mergeObjects(Object.entries(subContainers ?? {}).map(([name, value]) => (
             mediaBreakpoints(value, val => ({
                 '.container-base': {
-                    [`--${name}-max-width`]: getWidth(val),
-                    [`--${name}-side-width`]: `calc((var(--${name}-max-width) - var(--content-max-width)) / 2 )`,
-                    [`--${name}-width`]: `minmax(0, var(--${name}-side-width))`
+                    [getMaxWidthProperty(name)]: getWidth(val),
+                    [getSideWidthProperty(name)]: `calc((var(${getMaxWidthProperty(name)}) - var(${getMaxWidthProperty('content')})) / 2 )`,
+                    [getWidthProperty(name)]: `minmax(0, var(${getSideWidthProperty(name)}))`
                 }
             }))
         ))),
@@ -89,31 +89,31 @@ export default plugin.withOptions<PluginOptions>((options) => ({
 
             '.container-base > *' : {
                 /* Padding removed (remove padding from children to prevent double padding) */
-                '--container-padding': '0px'
+                [getPaddingProperty('container')]: '0px'
             },
             '.container-base': {
                 /* Full */
-                '--full-width': 'minmax(var(--container-padding), 1fr)',
+                [getWidthProperty('full')]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
 
                 /* Content */
-                '--content-width': 'min(var(--content-max-width), 100% - (var(--container-padding) * 2))',
+                [getWidthProperty('content')]: `min(var(${getMaxWidthProperty('content')}), 100% - (var(${getPaddingProperty('container')}) * 2))`,
 
                 /* Generate sub containers css variables (this part is split out above to work with every @media (min-width: *) that is add in subContainers screens params) */
 
                 /* Generate the grid with sub containers and padding applied*/
                 display: 'grid',
                 'grid-template-columns': `
-                    [full-start] var(--full-width) 
+                    [full-start] var(${getWidthProperty('full')}) 
                     ${ Object.keys(subContainers ?? {}).map((name) => 
                     //   [feature-start] var(--feature-width)
-                        `[${name}-start] var(--${name}-width)`
+                        `[${name}-start] var(${getWidthProperty(name)})`
                     ).join('\n') }
-                    [content-start] var(--content-width) [content-end] 
+                    [content-start] var(${getWidth('content')}) [content-end] 
                     ${ Object.keys(subContainers ?? {}).reverse().map((name) => 
                     //   var(--feature-width) [feature-end]
-                        `var(--${name}-width) [${name}-end]`
+                        `var(${getWidthProperty(name)}) [${name}-end]`
                     ).join('\n') }
-                    var(--full-width) [full-end]
+                    var(${getWidthProperty('full')}) [full-end]
                 `,
             },
             /* Set the children default with to the container (use -escape suffix to use the full container width) */
@@ -213,7 +213,7 @@ function mediaBreakpointResolver<T extends object>(
 /**
  * Simple wrapper for the mediaBreakpointResolver function to abstract screen sizes
  */
-function useMediaBreakpointResolver<T extends object>(screens: object) {
+function useMediaBreakpointResolver(screens: object) {
     return <T extends object>(value: SizeOption, callBack: (val: WidthOption) => T) => mediaBreakpointResolver(screens, value, callBack);
 } 
 
@@ -242,6 +242,14 @@ function getCssVariableName(prefix: string, property: string) {
  */
 function getWidthProperty(prefix: string) {
     const WIDTH_PROPERTY = 'width';
+    return getCssVariableName(prefix, WIDTH_PROPERTY);
+}
+
+/**
+ * Retrieve the CSS variable name from a side width property with a given prefix ([prefix]-side-width)
+ */
+function getSideWidthProperty(prefix: string) {
+    const WIDTH_PROPERTY = 'side-width';
     return getCssVariableName(prefix, WIDTH_PROPERTY);
 }
 
