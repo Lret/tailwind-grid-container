@@ -1,50 +1,77 @@
 import plugin from "tailwindcss/plugin";
 import defaultTheme from 'tailwindcss/defaultTheme';
 
+/* Types */
 type WidthOption = number | string;
 
-type Screen = keyof typeof defaultTheme.screens | 'DEFAULT' | (string & {}); //'DEFAULT' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | (string & {});
-type ScreenOption = Partial<Record<Screen, WidthOption>>;
+type ScreenSize = keyof typeof defaultTheme.screens | 'DEFAULT' | (string & {}); //'DEFAULT' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | (string & {});
+type ScreenOption = Partial<Record<ScreenSize, WidthOption>>;
 
-type FeatureOption = WidthOption | ScreenOption
+type SizeOption = WidthOption | ScreenOption
 
 type Feature = {
-    [name: string]: FeatureOption;
+    [name: string]: SizeOption;
 }
 
-type Options = {
+type PluginOptions = {
     baseName?: string
-    padding: FeatureOption;
-    maxWidth: FeatureOption;
+    padding: SizeOption;
+    screens: SizeOption;
     subContainers?: Feature
 }
 
-// const DEFAULT_OPTIONS: Options = {}
 
-export default plugin.withOptions<Options>((options) => ({
+/* Plugin */
+// const DEFAULT_OPTIONS: PluginOptions = {}
+
+export default plugin.withOptions<PluginOptions>((options) => ({
     addBase, 
     addComponents,
     addUtilities,
     config
 }) => {
     const screens = config().theme?.screens ?? defaultTheme.screens;
-    const { baseName, maxWidth, padding, subContainers } = options;
-    const mediaBreakpoint = <T extends object>(value: FeatureOption, callBack: (val: WidthOption) => T) => screenResolver(screens, value, callBack);
-
+    const { baseName, screens: contentMaxWidth, padding, subContainers } = options;
+    const mediaBreakpoints = useMediaBreakpointResolver(screens)
+    
     addComponents([
-        mediaBreakpoint(padding, p => ({
+        /* Generate the outer padding that will always be applied for all screen size breakpoints specified in 'padding' parameter when giving a object instead of a value */
+        /* 
+            padding: 10, <- when only a value is applied this will be set for all breakpoints
+            
+            padding : { <- when a object is passed with multiple breakpoints, the padding will be applied for every breakpoint
+                sm: 10
+                md: 20
+            }
+        */
+        mediaBreakpoints(padding, p => ({
             ':root': {
                 /* Padding / gap (has to be set in root to override) */
                 '--container-padding': getWidth(p)
             }
         })),
-        mediaBreakpoint(maxWidth, w => ({
+
+        /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
+        mediaBreakpoints(contentMaxWidth, w => ({
             '.container-base': {
                 '--content-max-width': getWidth(w),
             }
         })),
+
+        /* Generate sub containers needed css variables for all screen size breakpoints specified in 'subContainers' parameter when giving a object instead of a value */
+        /* Sub containers (the blocks are generated based on input from the user, ex:
+            popout: { <- name of the sub container
+                screens: {
+                sm: 600, <- max width when a number is applied a 'px' suffix will be add
+                md: 728,
+                lg: '984px',
+
+                sm: 'minmax(0, 5rem)' <- string to override default calculation see (--feature-width)
+                }
+            }
+        )  */
         mergeObjects(Object.entries(subContainers ?? {}).map(([name, value]) => (
-            mediaBreakpoint(value, val => ({
+            mediaBreakpoints(value, val => ({
                 '.container-base': {
                     [`--${name}-max-width`]: getWidth(val),
                     [`--${name}-side-width`]: `calc((var(--${name}-max-width) - var(--content-max-width)) / 2 )`,
@@ -69,46 +96,22 @@ export default plugin.withOptions<Options>((options) => ({
                 '--full-width': 'minmax(var(--container-padding), 1fr)',
 
                 /* Content */
-                // @mediaBreakpoint
-                /*'--content-max-width': getWidth(maxWidth),*/ 
                 '--content-width': 'min(var(--content-max-width), 100% - (var(--container-padding) * 2))',
 
-                /* Features (the blocks are generated based on input from the user, ex: 
-                    popout: {
-                        screens: {
-                        sm: 600, <- max width, in number ?or px suffix?
-                        md: 728,
-                        lg: '984px',
+                /* Generate sub containers css variables (this part is split out above to work with every @media (min-width: *) that is add in subContainers screens params) */
 
-                        sm: 'minmax(0, 5rem)' <- string to override default calculation see (--feature-width)
-                        }
-                    }
-                )  */
-                // @mediaBreakpoint
-                /*
-                ...mergeObjects(Object.entries(subContainers ?? {}).map(([name, value]) => {
-                    // if (typeof value === 'string')
-                    //     return { [`--${name}-max-width`]: value }; 
-
-                    return ({
-                        [`--${name}-max-width`]: getWidth(value), // Should be in base, change based on sm, md, ect?
-                        [`--${name}-side-width`]: `calc((var(--${name}-max-width) - var(--content-max-width)) / 2 )`,
-                        [`--${name}-width`]: `minmax(0, var(--${name}-side-width))`
-                    });
-                })),
-                */
-
+                /* Generate the grid with sub containers and padding applied*/
                 display: 'grid',
                 'grid-template-columns': `
                     [full-start] var(--full-width) 
                     ${ Object.keys(subContainers ?? {}).map((name) => 
                     //   [feature-start] var(--feature-width)
-                        `[${name}-start] var(--${name}-width)` // Use function for this var names
+                        `[${name}-start] var(--${name}-width)`
                     ).join('\n') }
                     [content-start] var(--content-width) [content-end] 
                     ${ Object.keys(subContainers ?? {}).reverse().map((name) => 
                     //   var(--feature-width) [feature-end]
-                        `var(--${name}-width) [${name}-end]` // Use function for this var names
+                        `var(--${name}-width) [${name}-end]`
                     ).join('\n') }
                     var(--full-width) [full-end]
                 `,
@@ -126,18 +129,16 @@ export default plugin.withOptions<Options>((options) => ({
             '.container-full-bg, .container-full': {
                 'grid-column': 'full',
             },
-            /* Generated Features */
+
+            /* Generated sub-containers names for grid-columns */
             // '.container-feature': {
             //     'grid-column': 'feature'
             // },
-            // ...{...Object.keys(subContainers ?? {}).map(name => ({
-            //     [`.container-${name}`]: {
-            //         'grid-column': name,
-            //     }
-            // }))}
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
                 ...acc, 
-                [`.container-${name}`]: { 'grid-column': name }
+                [`.container-${name}`]: {
+                    'grid-column': name
+                }
             }), {}))
         }
     ])
@@ -145,20 +146,57 @@ export default plugin.withOptions<Options>((options) => ({
 
 
 /* Utils */
-// screenResolver(p => ({'--container-padding': getWidth(p)}))
-function screenResolver<T extends object>(
+/**
+ * Wraps the result of the callback for all screen sizes when needed or simply returns with one size
+ * Example: given that the callback is: 
+ *      w => ({
+ *          '.test-class': {
+ *               '--test-variable-width': w,
+ *           }
+ *       })
+ * and the screens are:
+ *      {
+ *          sm: '360px',
+ *          md: '720px',
+ *      }
+ * when sizes is '10px', this will return an object like:
+ *      {
+ *           '.test-class': {
+ *               '--test-variable-width': 10px,
+ *           }
+ *      }
+ * 
+ * When sizes is { DEFAULT: 10px, sm: 20px, md: 30% } what will result in a object with 
+ *      {
+ *           '.test-class': {
+ *               '--test-variable-width': 10px,
+ *           },
+ *           @media (min-width: 360px) : {
+ *              '.test-class': {
+ *                  '--test-variable-width': 20px,
+ *              },
+ *           }
+ *           @media (min-width: 720px) : {
+ *              '.test-class': {
+ *                  '--test-variable-width': 30%,
+ *              },
+ *           }
+ *      }
+ */
+function mediaBreakpointResolver<T extends object>(
     screens: object,
-    value: FeatureOption,
+    sizes: SizeOption,
     callBack: (val: WidthOption) => T
 ) {
-    if (typeof value !== 'object')
-        return callBack(value);
+    // When it is not of type ScreenOption (not an object width different screen sizes)
+    if (typeof sizes !== 'object')
+        return callBack(sizes);
 
     // Should check for default, when default add without media query
-    const DEFAULT = value.DEFAULT !== undefined ? callBack(value.DEFAULT) : {};
+    const DEFAULT = sizes.DEFAULT !== undefined ? callBack(sizes.DEFAULT) : {};
 
     return Object
-        .entries(value)
+        .entries(sizes)
         .reduce((acc, [key, val]) => {
             // @ts-ignore
             const breakpoint = screens[key];
@@ -172,37 +210,60 @@ function screenResolver<T extends object>(
         }, DEFAULT)
 }
 
-// function callFnWithArgs (callback: (...args: ReturnType<typeof getArgs>) => void) {
-//     callback(...getArgs())
-//   }
+/**
+ * Simple wrapper for the mediaBreakpointResolver function to abstract screen sizes
+ */
+function useMediaBreakpointResolver<T extends object>(screens: object) {
+    return <T extends object>(value: SizeOption, callBack: (val: WidthOption) => T) => mediaBreakpointResolver(screens, value, callBack);
+} 
 
-// screenResolver(p => ({}));
 
+/**
+ * Retrieve the accurate width. 
+ * When a numerical value is provided, display it in pixels. 
+ * Everything else will be returned as its intended values (e.g., 100%, 10rem, etc.).
+ */
 function getWidth(width: WidthOption) {
     if (typeof width === "number")
         return `${width}px`;
     return width;
 }
 
-function getVar(name: string, property: string) {
-    return `--${name}-${property}`
+/**
+ * Get the css variable name from a given prefix and property
+ * For example: full-width, feature-padding, feature-max-width
+ */
+function getCssVariableName(prefix: string, property: string) {
+    return `--${prefix}-${property}`
 }
 
+/**
+ * Retrieve the CSS variable name from a width property with a given prefix ([prefix]-width)
+ */
+function getWidthProperty(prefix: string) {
+    const WIDTH_PROPERTY = 'width';
+    return getCssVariableName(prefix, WIDTH_PROPERTY);
+}
+
+/**
+ * Retrieve the CSS variable name from a max widht property with a given prefix ([prefix]-max-width)
+ */
+function getMaxWidthProperty(prefix: string) {
+    const MAX_WIDTH_PROPERTY = 'max-width';
+    return getCssVariableName(prefix, MAX_WIDTH_PROPERTY);
+}
+
+/**
+ * Retrieve the CSS variable name from a padding property with a given prefix ([prefix]-padding)
+ */
+function getPaddingProperty(prefix: string) {
+    const PADDING_PROPERTY = 'padding';
+    return getCssVariableName(prefix, PADDING_PROPERTY);
+}
+
+/**
+ * Merge an array of object to a single object
+ */
 function mergeObjects<T> (objectsArray: T[]) {
     return Object.assign({}, ...objectsArray) as T;
-}
-
-function getWidthProperty(name: string) {
-    const WIDTH_PROPERTY = 'width';
-    return getVar(name, WIDTH_PROPERTY);
-}
-
-function getMaxWidthProperty(name: string) {
-    const MAX_WIDTH_PROPERTY = 'max-width';
-    return getVar(name, MAX_WIDTH_PROPERTY);
-}
-
-function getPaddingProperty(name: string) {
-    const PADDING_PROPERTY = 'padding';
-    return getVar(name, PADDING_PROPERTY);
 }
