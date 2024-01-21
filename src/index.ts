@@ -68,53 +68,61 @@ require("tailwind-grid-container")({
     // Add a default of 100% maxWidth for the content when the DEFAULT property is not set
     const contentMaxWidth = typeof screens !== "object" ? screens : { ...(screens.DEFAULT === undefined ? { DEFAULT: '100%' } : {}), ...screens };
     const screensSizes = config().theme?.screens ?? defaultTheme.screens;
-    const mediaBreakpoints = useMediaBreakpointResolver(screensSizes);
+    const mediaBreakpoints = useMediaBreakpointsResolver(screensSizes);
 
     addComponents([
-        /* Generate the outer padding that will be applied for all screen size breakpoints specified in 'padding' parameter when giving a object instead of a value */
-        /* 
-            padding: 10, <- when only a value is applied this will be set for all breakpoints
-            
-            padding : { <- when a object is passed with multiple breakpoints, the padding will be applied for every breakpoint
-                sm: 10
-                md: 20
-            }
-        */
-        mediaBreakpoints(padding, p => ({
-            ':root': {
-                /* Padding / gap (has to be set in root to override) */
-                [getPaddingProperty('container')]: getWidth(p)
-            }
-        })),
+        mediaBreakpoints([
+            [
+                /* Generate the outer padding that will be applied for all screen size breakpoints specified in 'padding' parameter when giving a object instead of a value */
+                /* 
+                    padding: 10, <- when only a value is applied this will be set for all breakpoints
+                    
+                    padding : { <- when a object is passed with multiple breakpoints, the padding will be applied for every breakpoint
+                        sm: 10
+                        md: 20
+                    }
+                */
+                padding,
+                p => ({
+                    ':root': {
+                        /* Padding / gap (has to be set in root to override) */
+                    [getPaddingProperty('container')]: getWidth(p)
+                    }
+                })
+            ],
+            [
+                /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
+                contentMaxWidth,
+                w => ({
+                    [`.${baseName}`]: {
+                        [getMaxWidthProperty('content')]: getWidth(w),
+                    }
+                })
+            ],
+            //@ts-ignore
+            ...(Object.entries(subContainers ?? {}).map(([subContainerName, subContainerSize]) => ([
+                /* Generate sub containers needed css variables for all screen size breakpoints specified in 'subContainers' parameter when giving a object instead of a value */
+                /* Sub containers (the blocks are generated based on input from the user, ex:
+                    popout: { <- name of the sub container
+                        screens: {
+                            sm: 600, <- max width when a number is applied a 'px' suffix will be add
+                            md: 728,
+                            lg: '984px',
 
-        /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
-        mediaBreakpoints(contentMaxWidth, w => ({
-            [`.${baseName}`]: {
-                [getMaxWidthProperty('content')]: getWidth(w),
-            }
-        })),
-
-        /* Generate sub containers needed css variables for all screen size breakpoints specified in 'subContainers' parameter when giving a object instead of a value */
-        /* Sub containers (the blocks are generated based on input from the user, ex:
-            popout: { <- name of the sub container
-                screens: {
-                    sm: 600, <- max width when a number is applied a 'px' suffix will be add
-                    md: 728,
-                    lg: '984px',
-
-                    sm: 'minmax(0, 5rem)' <- string to override default calculation see (--feature-width)
-                }
-            }
-        )  */
-        mergeObjects(Object.entries(subContainers ?? {}).map(([name, value]) => (
-            mediaBreakpoints(value, val => ({
-                [`.${baseName}`]: {
-                    [getMaxWidthProperty(name)]: getWidth(val),
-                    [getSideWidthProperty(name)]: `calc((var(${getMaxWidthProperty(name)}) - var(${getMaxWidthProperty('content')})) / 2 )`,
-                    [getWidthProperty(name)]: `minmax(0, var(${getSideWidthProperty(name)}))`
-                }
-            }))
-        ))),
+                            sm: 'minmax(0, 5rem)' <- string to override default calculation see (--feature-width)
+                        }
+                    }
+                )  */
+                subContainerSize,
+                (subContainerWidth: WidthOption) => ({
+                    [`.${baseName}`]: {
+                        [getMaxWidthProperty(subContainerName)]: getWidth(subContainerWidth),
+                        [getSideWidthProperty(subContainerName)]: `calc((var(${getMaxWidthProperty(subContainerName)}) - var(${getMaxWidthProperty('content')})) / 2 )`,
+                        [getWidthProperty(subContainerName)]: `minmax(0, var(${getSideWidthProperty(subContainerName)}))`
+                    }
+                })
+            ])))
+        ]),
 
         {
             /* Generate the outer padding that will be applied for all screen size breakpoints (this part is split out above to work with every @media (min-width: *)) */
@@ -219,7 +227,7 @@ function mediaBreakpointResolver<T extends object>(
     screensSizes: object,
     sizes: SizeOption,
     callBack: (val: WidthOption) => T,
-) {
+)/*: T | ({DEFAULT: T} & Record<`@media (min-width: ${keyof screensSizes})`, T>)*/ {
     // When it is not of type ScreenOption (not an object width different screen sizes)
     if (typeof sizes !== 'object')
         return callBack(sizes);
@@ -246,7 +254,18 @@ function mediaBreakpointResolver<T extends object>(
  * Simple wrapper for the mediaBreakpointResolver function to abstract screen sizes
  */
 function useMediaBreakpointResolver(screensSizes: object) {
-    return <T extends object>(value: SizeOption, callBack: (val: WidthOption) => T) => mediaBreakpointResolver(screensSizes, value, callBack);
+    return <T extends object>(value: SizeOption, callBack: (val: WidthOption) => T) =>
+        mediaBreakpointResolver(screensSizes, value, callBack);
+} 
+
+/**
+ * Simple wrapper for multiple mediaBreakpointResolver function and abstracting screen sizes
+ */
+function useMediaBreakpointsResolver(screensSizes: object) {
+    const mediaBreakpoints = useMediaBreakpointResolver(screensSizes);
+
+    return <T extends object>(params: [value: SizeOption, callBack: (val: WidthOption) => T][]) =>
+        deepMergeObjects( params.map( param/*[value, callback]*/ => mediaBreakpoints(...param)))
 } 
 
 
@@ -304,6 +323,22 @@ function getPaddingProperty(prefix: string) {
 /**
  * Merge an array of object to a single object
  */
-function mergeObjects<T> (objectsArray: T[]) {
-    return Object.assign({}, ...objectsArray) as T;
+function deepMergeObjects<T>(objectsArray: T[]) {
+    const result = objectsArray.pop() ?? {};
+    while (objectsArray.length) {
+        let next = objectsArray.pop();
+        if (next === null || typeof next !== 'object')
+            continue;
+        
+        Object.keys(next).map((key) => {
+            // @ts-ignore
+            result[key] = (result[key] && typeof result[key] === 'object')
+                // @ts-ignore
+                ? deepMergeObjects([result[key], next[key]])
+                // @ts-ignore
+                : next[key]
+        });
+    }
+
+    return result;
 }
