@@ -14,9 +14,10 @@ type Feature = {
 }
 
 type PluginOptions = {
-    baseName?: string; // (default is 'container') name for the base container 
+    containerPrefix?: string // ('container') The prefix used for each container
+    baseName?: string; // (default is '') name for the base container 
     fullSizeName?: string; // (default is 'full') name for the full width container inside the base container, this allows the escape the container 
-    backgroundPrefixName?: string; // (default is 'bg') name for the background prefix specifier, this allows to escape the container and place the children back inside the container, this mimics the element to be only used as a background 
+    backgroundSuffixName?: string; // (default is 'bg') name for the background prefix specifier, this allows to escape the container and place the children back inside the container, this mimics the element to be only used as a background 
 
     subContainers?: Feature; // Sub container width or widths, work the same as screens from the default container
 
@@ -26,10 +27,11 @@ type PluginOptions = {
 
 
 /* Plugin */
-const DEFAULT_OPTIONS: Required<Pick<PluginOptions, "baseName" | "fullSizeName" | "backgroundPrefixName">> = {
-    baseName: 'container',
+const DEFAULT_OPTIONS: Required<Pick<PluginOptions, "baseName" | "fullSizeName" | "backgroundSuffixName" | "containerPrefix">> = {
+    containerPrefix: 'container',
+    baseName: '',
     fullSizeName: 'full',
-    backgroundPrefixName: 'bg',
+    backgroundSuffixName: 'bg',
 }
 
 export default plugin.withOptions<PluginOptions>((options) => ({ 
@@ -38,15 +40,28 @@ export default plugin.withOptions<PluginOptions>((options) => ({
     config
 }) => {
     const {
+        containerPrefix = DEFAULT_OPTIONS.containerPrefix,
         baseName = DEFAULT_OPTIONS.baseName,
         fullSizeName = DEFAULT_OPTIONS.fullSizeName,
-        backgroundPrefixName = DEFAULT_OPTIONS.backgroundPrefixName,
+        backgroundSuffixName = DEFAULT_OPTIONS.backgroundSuffixName,
         subContainers,
         screens = (defaultTheme.screens as unknown as ScreenSize),
         padding = 0,
     } = options;
 
-    if (corePlugins('container') && baseName === 'container')
+    if (!containerPrefix) throw new Error(`
+# Tailwind-grid-container error, 'containerPrefix' can not be empty.
+
+The containerPrefix parameter inside the Tailwind-grid-container plugin can not be an empty value
+`)
+
+    if (!fullSizeName) throw new Error(`
+# Tailwind-grid-container error, 'fullSizeName' can not be empty.
+
+The baseName parameter inside the Tailwind-grid-container plugin can not be an empty value
+`)
+
+    if (corePlugins('container') && containerPrefix === 'container' && baseName === '')
         throw new Error(`
 # Tailwind-grid-container error, container class already exists.
 
@@ -69,6 +84,16 @@ require("tailwind-grid-container")({
     const contentMaxWidth = typeof screens !== "object" ? screens : { ...(screens.DEFAULT === undefined ? { DEFAULT: '100%' } : {}), ...screens };
     const screensSizes = config().theme?.screens ?? defaultTheme.screens;
     const mediaBreakpoints = useMediaBreakpointsResolver(screensSizes);
+
+    const gridColumnMappings: {subContainerName: string, contentGridName: string}[] = [
+        // { name: 'content', value: 'content' },
+        { subContainerName: baseName ? baseName : 'content', contentGridName: 'content' },
+        { subContainerName: fullSizeName, contentGridName: 'full' },
+        { subContainerName: `${fullSizeName}-bg`, contentGridName: 'full' },
+        ...Object.keys(subContainers ?? {}).map(subContainerName => (
+            { subContainerName, contentGridName: subContainerName }
+        )),
+    ]
 
     addComponents([
         mediaBreakpoints([
@@ -94,7 +119,7 @@ require("tailwind-grid-container")({
                 /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
                 contentMaxWidth,
                 w => ({
-                    [`.${baseName}`]: {
+                    [`.${baseName ? `${containerPrefix}-${baseName}` : containerPrefix}`]: {
                         [getMaxWidthProperty('content')]: getWidth(w),
                     }
                 })
@@ -115,7 +140,7 @@ require("tailwind-grid-container")({
                 )  */
                 subContainerSize,
                 (subContainerWidth: WidthOption) => ({
-                    [`.${baseName}`]: {
+                    [`.${baseName ? `${containerPrefix}-${baseName}` : containerPrefix}`]: {
                         [getMaxWidthProperty(subContainerName)]: getWidth(subContainerWidth),
                         [getSideWidthProperty(subContainerName)]: `calc((var(${getMaxWidthProperty(subContainerName)}) - var(${getMaxWidthProperty('content')})) / 2 )`,
                         [getWidthProperty(subContainerName)]: `minmax(0, var(${getSideWidthProperty(subContainerName)}))`
@@ -127,11 +152,11 @@ require("tailwind-grid-container")({
         {
             /* Generate the outer padding that will be applied for all screen size breakpoints (this part is split out above to work with every @media (min-width: *)) */
 
-            [`.${baseName} > *`]: {
+            [`.${baseName ? `${containerPrefix}-${baseName}` : containerPrefix} > *`]: {
                 /* Padding removed (remove padding from children to prevent double padding) */
                 [getPaddingProperty('container')]: '0px'
             },
-            [`.${baseName}`]: {
+            [`.${baseName ? `${containerPrefix}-${baseName}` : containerPrefix}`]: {
                 /* Full */
                 [getWidthProperty('full')]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
 
@@ -156,17 +181,23 @@ require("tailwind-grid-container")({
                     var(${getWidthProperty('full')}) [full-end]
                 `,
             },
-            /* Set the children default with to the container (use -escape suffix to use the full container width) */
-            [`.${baseName} > *, .container-${fullSizeName}-${backgroundPrefixName} > *`]: {
+            /* Set the children default with to the container (use -${backgroundSuffixName} suffix to use the full container width) */
+            //   .container-base > *,
+            //   .container-full-bg > *
+            [
+                `.${baseName ? `${containerPrefix}-${baseName}` : containerPrefix} > *, 
+                 .${containerPrefix}-${fullSizeName}-${backgroundSuffixName} > *`
+            ]: {
                 'grid-column': 'content',
             },
             /* Full width container */
-            /* Only full has the choice between background (only full width the background and keep the children content width), because it is based on the whole width with paddding. All feature are just segments/stops between full and content */
-            [`.container-${fullSizeName}-${backgroundPrefixName}`]: {
+            /* Only full has the choice between background (only full width the background and keep the children content width), because it is based on the whole width with padding. All feature are just segments/stops between full and content */
+            //   .container-full-bg
+            [`.${containerPrefix}-${fullSizeName}-${backgroundSuffixName}`]: {
                 display: 'grid',
                 'grid-template-columns': 'inherit',
             },
-            [`.container-${fullSizeName}-${backgroundPrefixName}, .container-${fullSizeName}`]: {
+            [`.${containerPrefix}-${fullSizeName}-${backgroundSuffixName}, .${containerPrefix}-${fullSizeName}`]: {
                 'grid-column': 'full',
             },
 
@@ -176,10 +207,64 @@ require("tailwind-grid-container")({
             // },
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
                 ...acc, 
-                [`.container-${name}`]: {
+                [`.${containerPrefix}-${name}`]: {
                     'grid-column': name
                 }
-            }), {}))
+            }), {})),
+
+
+            /* Generated sub-containers names for grid-columns connected to others */
+            // '.container-feature-to-full': {
+            //     'grid-column': 'feature / full'
+            // },
+            ...(gridColumnMappings).reduce((acc, { subContainerName: sourceName, contentGridName: sourceGrid }) => ({
+                ...acc, 
+                ...(gridColumnMappings).reduce((acc, { subContainerName: targetName, contentGridName: targetGrid }) =>
+                    sourceName === targetName ? acc : ({
+                        ...acc,
+                        [`.${containerPrefix}-${sourceName}-${targetName}`]: {
+                            'grid-column': `${sourceGrid} / ${targetGrid}`
+                            }
+                        }), {}),
+            }), {}),
+
+            ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
+                ...acc, 
+                [
+                    `.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName} > *, 
+                    .${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName} > *`
+                ]: {
+                    'grid-column': 'content',
+                },
+            
+                // .container-${sourceName}-${targetName}-bg
+                [
+                    `.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}, 
+                    .${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`
+                ]: {
+                    display: 'grid',
+                    'grid-template-columns': 'inherit', // <- missing  missing offset
+                    // 'grid-template-columns': `
+                    //     [full-start] var(${getWidthProperty('full')}) 
+                    //     ${ Object.keys(subContainers ?? {}).map((name) => 
+                    //     //   [feature-start] var(--feature-width)
+                    //         `[${name}-start] var(${getWidthProperty(name)})`
+                    //     ).join('\n') }
+                    //     [content-start] var(${getWidthProperty('content')}) [content-end] 
+                    //     ${ Object.keys(subContainers ?? {}).reverse().map((name) => 
+                    //     //   var(--feature-width) [feature-end]
+                    //         `var(${getWidthProperty(name)}) [${name}-end]`
+                    //     ).join('\n') }
+                    //     var(${getWidthProperty('full')}) [full-end]
+                    // `,
+                },
+                [`.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}`]: {
+                    'grid-column': `${name} / full`
+                },
+                [`.${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`]: {
+                    'grid-column': `full / ${name}`
+                }
+            }), {})),
         }
     ])
 })
