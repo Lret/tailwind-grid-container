@@ -238,31 +238,28 @@ require("tailwind-grid-container")({
                 },
             
                 // .container-${sourceName}-${targetName}-bg
-                [
-                    `.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}, 
-                    .${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`
-                ]: {
-                    display: 'grid',
-                    'grid-template-columns': 'inherit', // <- missing  missing offset
-                    // 'grid-template-columns': `
-                    //     [full-start] var(${getWidthProperty('full')}) 
-                    //     ${ Object.keys(subContainers ?? {}).map((name) => 
-                    //     //   [feature-start] var(--feature-width)
-                    //         `[${name}-start] var(${getWidthProperty(name)})`
-                    //     ).join('\n') }
-                    //     [content-start] var(${getWidthProperty('content')}) [content-end] 
-                    //     ${ Object.keys(subContainers ?? {}).reverse().map((name) => 
-                    //     //   var(--feature-width) [feature-end]
-                    //         `var(${getWidthProperty(name)}) [${name}-end]`
-                    //     ).join('\n') }
-                    //     var(${getWidthProperty('full')}) [full-end]
-                    // `,
-                },
                 [`.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}`]: {
-                    'grid-column': `${name} / full`
+                    'grid-column': `${name} / full`, 
+                    // [`${getWidthProperty('full')}`]: "0px"
                 },
                 [`.${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`]: {
-                    'grid-column': `full / ${name}`
+                    'grid-column': `full / ${name}`,
+                    'display': 'grid',
+                    // 'grid-template-columns': 'inherit', // <- missing  missing offset
+                    'grid-template-columns': `
+                        [full-start] var(${getWidthProperty('full')})
+                        ${ Object.keys(subContainers ?? {}).map((name) => 
+                        //   [feature-start] var(--feature-width)
+                            `[${name}-start] var(${getWidthProperty(name)})`
+                        ).join('\n') }
+                        [content-start] var(${getWidthProperty('content')}) [content-end] 
+                        ${ Object.keys(subContainers ?? {}).reverse().map((name) => 
+                        //   var(--feature-width) [feature-end]
+                            `var(${getWidthProperty(name)}) [${name}-end]`
+                        ).join('\n') }
+                        0px [full-end]
+                    `,
+                    // [`${getWidthProperty('full')}`]: "0px"
                 }
             }), {})),
         }
