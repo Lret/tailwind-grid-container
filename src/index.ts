@@ -240,12 +240,11 @@ require("tailwind-grid-container")({
                 // .container-${sourceName}-${targetName}-bg
                 [`.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}`]: {
                     'grid-column': `${name} / full`, 
-                    // [`${getWidthProperty('full')}`]: "0px"
                 },
+                
                 [`.${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`]: {
                     'grid-column': `full / ${name}`,
                     'display': 'grid',
-                    // 'grid-template-columns': 'inherit', // <- missing  missing offset
                     'grid-template-columns': `
                         [full-start] var(${getWidthProperty('full')})
                         ${ Object.keys(subContainers ?? {}).map((name) => 
@@ -259,13 +258,11 @@ require("tailwind-grid-container")({
                         ).join('\n') }
                         0px [full-end]
                     `,
-                    // [`${getWidthProperty('full')}`]: "0px"
                 }
             }), {})),
         }
     ])
 })
-
 
 /* Utils */
 /**
