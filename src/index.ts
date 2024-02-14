@@ -58,7 +58,7 @@ The containerPrefix parameter inside the Tailwind-grid-container plugin can not 
     if (!fullSizeName) throw new Error(`
 # Tailwind-grid-container error, 'fullSizeName' can not be empty.
 
-The baseName parameter inside the Tailwind-grid-container plugin can not be an empty value
+The fullSizeName parameter inside the Tailwind-grid-container plugin can not be an empty value
 `)
 
     if (corePlugins('container') && containerPrefix === 'container' && baseName === '')
@@ -73,11 +73,11 @@ corePlugins: {
     container: false,
 },
 
-To use a different class name, override the 'baseName' 
+To use a different class name, override the 'containerPrefix' 
 property in the tailwind-grid-container plugin:
 
 require("tailwind-grid-container")({
-    baseName: 'container-base',
+    containerPrefix: 'container-base',
 }),`)
 
     // Add a default of 100% maxWidth for the content when the DEFAULT property is not set
