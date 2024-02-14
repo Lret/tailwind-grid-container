@@ -1,6 +1,6 @@
 # tailwind-grid-container
 
-A Tailwind Plugin for Generating a Container Class with Layout Breakouts
+A Tailwind plugin for generating a container class with layout breakouts
 
 This plugin mimics the default container class provided by Tailwind and introduces the ability to "escape" the container. This is commonly useful when you want to create a background image that spans the full size while maintaining consistent content sizing.
 
