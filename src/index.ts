@@ -89,7 +89,6 @@ require("tailwind-grid-container")({
         // { name: 'content', value: 'content' },
         { subContainerName: baseName ? baseName : 'content', contentGridName: 'content' },
         { subContainerName: fullSizeName, contentGridName: 'full' },
-        { subContainerName: `${fullSizeName}-bg`, contentGridName: 'full' },
         ...Object.keys(subContainers ?? {}).map(subContainerName => (
             { subContainerName, contentGridName: subContainerName }
         )),
@@ -249,7 +248,7 @@ require("tailwind-grid-container")({
                     sourceName === targetName ? acc : ({
                         ...acc,
                         [`
-                            .${containerPrefix}-${sourceName}-${targetName} > *,
+                            .${containerPrefix}-${sourceName}-${targetName} > *
                         `]: {
                             'grid-column': `${sourceGrid} / ${targetGrid}`,
                             'display': 'grid',
@@ -275,6 +274,7 @@ require("tailwind-grid-container")({
             }), {}),
 
             // Feature with full
+            /* Covered in the gridColumnMappings
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
                 ...acc,
                 [
@@ -312,6 +312,7 @@ require("tailwind-grid-container")({
                     'grid-template-columns': 'subgrid',
                 },
             }), {})),
+            */
 
 
 // Parent = (set self) (Parent bg should have column as the name or feature, child should have same as parent unless its -bg then it should be content)
@@ -368,6 +369,7 @@ require("tailwind-grid-container")({
             }), {}),
 
             // Feature with full
+            /* Covered in the gridColumnMappings
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
                 ...acc,
                 //  .container-${sourceName}-full,
@@ -389,6 +391,7 @@ require("tailwind-grid-container")({
                     'grid-template-columns': 'subgrid',
                 },
             }), {})),
+            */
         }
     ])
 })
