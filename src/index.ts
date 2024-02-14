@@ -189,7 +189,7 @@ require("tailwind-grid-container")({
 // Children = (fallback from parent)
 
             /* Set the children default with to the container (use -${backgroundSuffixName} suffix to use the full container width) */
-            //   .container-base > *,
+            //   .container > *,
             //   .container-full-bg > *,
             // SHOULD: have everything with -bg > *
             [
@@ -202,31 +202,21 @@ require("tailwind-grid-container")({
                 'grid-template-columns': 'subgrid',
             },
 
-// Parent = (set self)
-
             /* Full width container */
-            /* Only full has the choice between background (only full width the background and keep the children content width), because it is based on the whole width with padding. All feature are just segments/stops between full and content */
-            //   .container-full,
-            //   .container-full-bg,
-            //   .container-full > *   (set child to size of parent)
+            //   .container-full > *
             [
-                `.${containerPrefix}-${fullSizeName},
-                 .${containerPrefix}-${fullSizeName}-${backgroundSuffixName},
-                 .${containerPrefix}-${fullSizeName} > *`
+                `.${containerPrefix}-${fullSizeName} > *`
             ]: {
                 'grid-column': 'full',
                 'display': 'grid',
                 'grid-template-columns': 'subgrid',
             },
 
-            /* Generated sub-containers names for grid-columns */
-            // '.container-feature, .container-feature > *': {
-            //     'grid-column': 'feature'
-            // },
+            /* Sub containers */
+            // '.container-feature > *'
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
                 ...acc, 
                 [`
-                    .${containerPrefix}-${name},
                     .${containerPrefix}-${name} > *
                 `]: {
                     'grid-column': name,
@@ -235,7 +225,7 @@ require("tailwind-grid-container")({
                 }
             }), {})),
 
-            // BG version
+            // '.container-feature-bg > *'
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
                 ...acc, 
                 [`
@@ -248,9 +238,9 @@ require("tailwind-grid-container")({
             }), {})),
 
 
-            // Cross sections
+            // Cross sections <- TODO
             /* Generated sub-containers names for grid-columns connected to others */
-            // '.container-feature-to-full': {
+            // '.container-feature-other': { 
             //     'grid-column': 'feature / full'
             // },
             ...(gridColumnMappings).reduce((acc, { subContainerName: sourceName, contentGridName: sourceGrid }) => ({
@@ -258,7 +248,9 @@ require("tailwind-grid-container")({
                 ...(gridColumnMappings).reduce((acc, { subContainerName: targetName, contentGridName: targetGrid }) =>
                     sourceName === targetName ? acc : ({
                         ...acc,
-                        [`.${containerPrefix}-${sourceName}-${targetName}`]: {
+                        [`
+                            .${containerPrefix}-${sourceName}-${targetName} > *,
+                        `]: {
                             'grid-column': `${sourceGrid} / ${targetGrid}`,
                             'display': 'grid',
                             'grid-template-columns': 'subgrid',
@@ -266,22 +258,49 @@ require("tailwind-grid-container")({
                     }), {}),
             }), {}),
 
+            // .container-feature-other-bg
+            ...(gridColumnMappings).reduce((acc, { subContainerName: sourceName, contentGridName: sourceGrid }) => ({
+                ...acc, 
+                ...(gridColumnMappings).reduce((acc, { subContainerName: targetName, contentGridName: targetGrid }) =>
+                    sourceName === targetName ? acc : ({
+                        ...acc,
+                        [`
+                            .${containerPrefix}-${sourceName}-${targetName}-${backgroundSuffixName} > *
+                        `]: { //
+                            'grid-column': 'content',
+                            'display': 'grid',
+                            'grid-template-columns': 'subgrid',
+                        }
+                    }), {}),
+            }), {}),
+
+            // Feature with full
             ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
-                ...acc,            
-                // .container-${sourceName}-${targetName}-bg
-                [`.${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}`]: {
-                    'grid-column': `${name} / full`, 
+                ...acc,
+                [
+                    // .container-${sourceName}-${targetName} > *
+                    `.${containerPrefix}-${name}-${fullSizeName} > *`
+                ]: {
+                    'grid-column': `${name} / full`,
                     'display': 'grid',
                     'grid-template-columns': 'subgrid',
                 },
+            }), {})),
 
-                // .container-${targetName}-${sourceName}-bg
-                [`.${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`]: {
+            ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
+                ...acc,
+                [
+                    // .container-${targetName}-${sourceName} > *
+                    `.${containerPrefix}-${fullSizeName}-${name} > *`
+                ]: {
                     'grid-column': `full / ${name}`,
                     'display': 'grid',
                     'grid-template-columns': 'subgrid',
                 },
+            }), {})),
 
+            ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
+                ...acc,
                 [
                     // .container-${sourceName}-${targetName}-bg > *,
                     // .container-${targetName}-${sourceName}-bg > *
@@ -289,6 +308,83 @@ require("tailwind-grid-container")({
                      .${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName} > *`
                 ]: {
                     'grid-column': 'content',
+                    'display': 'grid',
+                    'grid-template-columns': 'subgrid',
+                },
+            }), {})),
+
+
+// Parent = (set self) (Parent bg should have column as the name or feature, child should have same as parent unless its -bg then it should be content)
+
+            /* Full width container */
+            /* Only full has the choice between background (only full width the background and keep the children content width), because it is based on the whole width with padding. All feature are just segments/stops between full and content */
+            //   .container-full,
+            //   .container-full-bg,
+            [
+                `.${containerPrefix}-${fullSizeName},
+                 .${containerPrefix}-${fullSizeName}-${backgroundSuffixName}`
+            ]: {
+                'grid-column': 'full',
+                'display': 'grid',
+                'grid-template-columns': 'subgrid',
+            },
+
+            /* Generated sub-containers names for grid-columns */
+            // '.container-feature, .container-feature-bg': {
+            //     'grid-column': 'feature'
+            // },
+            ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
+                ...acc, 
+                [`
+                    .${containerPrefix}-${name},
+                    .${containerPrefix}-${name}-${backgroundSuffixName}
+                `]: {
+                    'grid-column': name,
+                    'display': 'grid',
+                    'grid-template-columns': 'subgrid',
+                }
+            }), {})),
+
+
+            // Cross sections
+            /* Generated sub-containers names for grid-columns connected to others */
+            // '.container-feature-other, .container-feature-other-bg': { 
+            //     'grid-column': 'feature / full'
+            // },
+            ...(gridColumnMappings).reduce((acc, { subContainerName: sourceName, contentGridName: sourceGrid }) => ({
+                ...acc, 
+                ...(gridColumnMappings).reduce((acc, { subContainerName: targetName, contentGridName: targetGrid }) =>
+                    sourceName === targetName ? acc : ({
+                        ...acc,
+                        [`
+                            .${containerPrefix}-${sourceName}-${targetName},
+                            .${containerPrefix}-${sourceName}-${targetName}-${backgroundSuffixName} 
+                        `]: {
+                            'grid-column': `${sourceGrid} / ${targetGrid}`,
+                            'display': 'grid',
+                            'grid-template-columns': 'subgrid',
+                        }
+                    }), {}),
+            }), {}),
+
+            // Feature with full
+            ...(Object.keys(subContainers ?? {}).reduce((acc, name) => ({
+                ...acc,
+                //  .container-${sourceName}-full,
+                //  .container-${sourceName}-full-bg
+                [`
+                    .${containerPrefix}-${name}-${fullSizeName},
+                    .${containerPrefix}-${name}-${fullSizeName}-${backgroundSuffixName}
+                `]: {
+                    'grid-column': `${name} / full`, 
+                    'display': 'grid',
+                    'grid-template-columns': 'subgrid',
+                },
+
+                //  .container-full-${sourceName},
+                //  .container-full-${sourceName}-bg
+                [`.${containerPrefix}-${fullSizeName}-${name}-${backgroundSuffixName}`]: {
+                    'grid-column': `full / ${name}`,
                     'display': 'grid',
                     'grid-template-columns': 'subgrid',
                 },
