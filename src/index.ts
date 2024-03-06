@@ -579,7 +579,6 @@ function deepMergeObjects<T>(objectsArray: T[]) {
         }, 
         {}
       );
-    console.log('Deep:', ordered);
 
-    return result;
+    return ordered;
 }
