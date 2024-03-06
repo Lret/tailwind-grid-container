@@ -81,7 +81,9 @@ require("tailwind-grid-container")({
 }),`)
 
     // Add a default of 100% maxWidth for the content when the DEFAULT property is not set
-    const contentMaxWidth = typeof screens !== "object" ? screens : { ...(screens.DEFAULT === undefined ? { DEFAULT: '100%' } : {}), ...screens };
+    const contentMaxWidth = (typeof screens !== "object") 
+        ? screens 
+        : { ...(screens.DEFAULT === undefined ? { DEFAULT: '100%' } : {}), ...screens }; 
     const screensSizes = config().theme?.screens ?? defaultTheme.screens;
     const mediaBreakpoints = useMediaBreakpointsResolver(screensSizes);
 
@@ -95,7 +97,7 @@ require("tailwind-grid-container")({
     ]
 
     const baseContainerName = baseName ? `${containerPrefix}-${baseName}` : containerPrefix;
-
+    
     addComponents([
         mediaBreakpoints([
             [
@@ -115,16 +117,16 @@ require("tailwind-grid-container")({
                     [getPaddingProperty('container')]: getWidth(p)
                     }
                 })
-            ],
+],
             [
-                /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
+                                /* Generate the max width for the content inside the container (smallest part and named screens inside the default container)  specified in 'screens; parameter when giving a object instead of a value */
                 contentMaxWidth,
                 w => ({
-                    [`.${baseContainerName}`]: {
-                        [getMaxWidthProperty('content')]: getWidth(w),
-                    }
-                })
-            ],
+                        [`.${baseContainerName}`]: {
+                            [getMaxWidthProperty('content')]: getWidth(w),
+                        }
+                    })
+                            ],
             //@ts-ignore
             ...(Object.entries(subContainers ?? {}).map(([subContainerName, subContainerSize]) => ([
                 /* Generate sub containers needed css variables for all screen size breakpoints specified in 'subContainers' parameter when giving a object instead of a value */
@@ -164,7 +166,7 @@ require("tailwind-grid-container")({
                 [getWidthProperty('full')]: `minmax(var(${getPaddingProperty('container')}), 1fr)`,
 
                 /* Content */
-                [getWidthProperty('content')]: `min(var(${getMaxWidthProperty('content')}), 100% - (var(${getPaddingProperty('container')}) * 2))`,
+                [getWidthProperty('content')]: `calc(min(var(${getMaxWidthProperty('content')}), 100%) - (var(${getPaddingProperty('container')}) * 2))`,   
 
                 /* Generate sub containers css variables (this part is split out above to work with every @media (min-width: *) that is add in subContainers screens params) */
 
@@ -456,7 +458,7 @@ function mediaBreakpointResolver<T extends object>(
             
             return {
                 ...acc,
-                 [`@media (min-width: ${breakpoint})`] : callBack(val)
+                [`@media (min-width: ${breakpoint})`] : callBack(val)
             }
         }, DEFAULT)
 }
@@ -550,6 +552,34 @@ function deepMergeObjects<T>(objectsArray: T[]) {
                 : next[key]
         });
     }
+
+    //@ts-ignore
+    const ordered = Object.keys(result).sort((a, b) => {
+        // Should always be placed as last when a or b has an @ and not the other
+        if (a.startsWith('@') !== b.startsWith('@'))
+            return a.startsWith('@') ? 1 : -1;
+
+        // : should always be placed first
+        if (a.startsWith(':') !== b.startsWith(':'))
+            return a.startsWith(':') ? -1 : 1;
+
+        // . should always be placed after tag
+        if (a.startsWith('.') !== b.startsWith('.'))
+            return a.startsWith('.') ? 1 : -1;
+
+        // Leave it as it is
+        // if (a > b) return -1;
+        // if (b > a) return 1;
+        return 0;
+    }).reduce(
+        (obj, key) => { 
+            //@ts-ignore
+            obj[key] = result[key]; 
+            return obj;
+        }, 
+        {}
+      );
+    console.log('Deep:', ordered);
 
     return result;
 }
